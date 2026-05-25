@@ -9,7 +9,7 @@ export async function fetchCoingecko(): Promise<FeedItem[]> {
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: { 'User-Agent': 'president-sim/0.2', Accept: 'application/json' },
-      cache: 'no-store',
+      cache: 'force-cache',
     });
     if (!res.ok) throw new Error(`coingecko HTTP ${res.status}`);
     const json: any = await res.json();

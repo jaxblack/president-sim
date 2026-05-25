@@ -47,7 +47,7 @@ async function fetchUsgs(s: any): Promise<FeedItem[]> {
   try {
     const res = await fetch(s.url, {
       signal: ctrl.signal,
-      cache: 'no-store',
+      cache: 'force-cache',
       headers: { 'User-Agent': 'president-sim/0.1' },
     });
     if (!res.ok) throw new Error(`USGS HTTP ${res.status}`);
@@ -70,14 +70,14 @@ async function fetchHn(s: any): Promise<FeedItem[]> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const idsRes = await fetch(s.url, { signal: ctrl.signal, cache: 'no-store' });
+    const idsRes = await fetch(s.url, { signal: ctrl.signal, cache: 'force-cache' });
     if (!idsRes.ok) throw new Error(`HN HTTP ${idsRes.status}`);
     const ids: number[] = await idsRes.json();
     const items = await Promise.all(
       ids.slice(0, 10).map(async (id) => {
         const r = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, {
           signal: ctrl.signal,
-          cache: 'no-store',
+          cache: 'force-cache',
         });
         return r.ok ? r.json() : null;
       })

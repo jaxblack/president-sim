@@ -11,7 +11,7 @@ export async function fetchGhTrending(): Promise<FeedItem[]> {
       Accept: 'application/vnd.github+json',
     };
     if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
-    const res = await fetch(url, { signal: ctrl.signal, headers, cache: 'no-store' });
+    const res = await fetch(url, { signal: ctrl.signal, headers, cache: 'force-cache' });
     if (!res.ok) throw new Error(`gh-trending HTTP ${res.status}`);
     const json: any = await res.json();
     return (json.items ?? []).slice(0, 8).map((r: any) => ({

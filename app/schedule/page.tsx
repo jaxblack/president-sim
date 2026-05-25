@@ -11,9 +11,6 @@ import {
 } from '@/lib/schedule';
 import SectionHeader from '../components/SectionHeader';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 const ROW_HEIGHT = 18; // px per 15 min slot
 const START_HOUR = 6;
 const END_HOUR = 23; // inclusive (last row label = 23:00)

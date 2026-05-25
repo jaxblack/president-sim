@@ -1,9 +1,6 @@
 import { loadPortfolio, computeKpis, ALLOC_COLORS, type Allocation } from '@/lib/portfolio';
 import SectionHeader from '../components/SectionHeader';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 function fmtUsd(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;

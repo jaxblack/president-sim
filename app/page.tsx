@@ -2,8 +2,8 @@ import { fetchAllFeeds, type FeedItem } from '@/lib/aggregator';
 import BriefingCard from './components/BriefingCard';
 import SectionHeader from './components/SectionHeader';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const dynamic = 'force-static';
+export const revalidate = false;
 
 const SECTIONS: { key: string; title: string; subtitle: string; icon: string }[] = [
   { key: '外交', title: '外交 · Foreign Affairs', subtitle: 'diplomatic wire', icon: '🌐' },

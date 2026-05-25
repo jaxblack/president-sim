@@ -11,7 +11,7 @@ export async function fetchWorldBank(): Promise<FeedItem[]> {
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: { 'User-Agent': 'president-sim/0.2' },
-      cache: 'no-store',
+      cache: 'force-cache',
     });
     if (!res.ok) throw new Error(`worldbank HTTP ${res.status}`);
     const json: any = await res.json();
