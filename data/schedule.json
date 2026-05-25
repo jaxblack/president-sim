@@ -1,0 +1,23 @@
+{
+  "date": "2026-05-25",
+  "items": [
+    { "id": "s01", "start": "06:30", "end": "07:00", "title": "PDB 早间情报简报", "location": "Situation Room", "priority": "critical", "category": "security",    "attendees": ["DNI", "CIA Director", "NSA"] },
+    { "id": "s02", "start": "07:00", "end": "07:30", "title": "晨练",                "location": "White House Gym",      "priority": "low",      "category": "personal",     "attendees": [] },
+    { "id": "s03", "start": "07:45", "end": "08:15", "title": "国家安全顾问一对一早餐", "location": "Private Dining",   "priority": "critical", "category": "security",     "attendees": ["NSA"] },
+    { "id": "s04", "start": "08:30", "end": "09:15", "title": "经济团队晨会",          "location": "Roosevelt Room",      "priority": "high",     "category": "economy",      "attendees": ["Treasury Sec", "Fed Chair", "NEC Director"] },
+    { "id": "s05", "start": "09:30", "end": "10:00", "title": "与德国总理通话",        "location": "Oval Office",         "priority": "high",     "category": "diplomatic",   "attendees": ["State Sec", "Interpreter"] },
+    { "id": "s06", "start": "10:15", "end": "10:30", "title": "签署 3 项行政命令",      "location": "Oval Office",         "priority": "medium",   "category": "ceremonial",   "attendees": ["WH Counsel"] },
+    { "id": "s07", "start": "10:45", "end": "11:45", "title": "联邦预算磋商",          "location": "Cabinet Room",        "priority": "high",     "category": "economy",      "attendees": ["OMB Director", "Speaker", "Senate Majority"] },
+    { "id": "s08", "start": "12:00", "end": "12:45", "title": "工作午餐 · 副总统 + 国务卿", "location": "Private Dining", "priority": "medium",   "category": "diplomatic",   "attendees": ["VP", "State Sec"] },
+    { "id": "s09", "start": "13:00", "end": "13:20", "title": "新闻发布会准备",        "location": "Press Briefing Room", "priority": "medium",   "category": "press",        "attendees": ["Press Sec"] },
+    { "id": "s10", "start": "13:30", "end": "14:00", "title": "白宫记者会",            "location": "East Room",           "priority": "high",     "category": "press",        "attendees": ["WH Press Corps"] },
+    { "id": "s11", "start": "14:15", "end": "15:15", "title": "接见日本首相代表团",    "location": "Cabinet Room",        "priority": "high",     "category": "diplomatic",   "attendees": ["Japan PM", "State Sec", "USTR"] },
+    { "id": "s12", "start": "15:30", "end": "16:15", "title": "国防情报简报(联合参谋长)", "location": "Situation Room", "priority": "critical", "category": "security",     "attendees": ["SecDef", "JCS Chairman"] },
+    { "id": "s13", "start": "16:30", "end": "16:50", "title": "党内参议院领袖通话",    "location": "Oval Office",         "priority": "medium",   "category": "diplomatic",   "attendees": ["Senate Majority Leader"] },
+    { "id": "s14", "start": "17:00", "end": "18:00", "title": "接受 CBS 60 Minutes 专访", "location": "Map Room",         "priority": "high",     "category": "press",        "attendees": ["CBS Crew"] },
+    { "id": "s15", "start": "18:30", "end": "19:00", "title": "国宴准备(更衣)",       "location": "Residence",           "priority": "low",      "category": "personal",     "attendees": [] },
+    { "id": "s16", "start": "19:30", "end": "21:00", "title": "外国元首国宴",          "location": "State Dining Room",   "priority": "high",     "category": "ceremonial",   "attendees": ["Japan PM", "Cabinet", "Senators"] },
+    { "id": "s17", "start": "21:30", "end": "22:00", "title": "晚间简报 + 次日预览",    "location": "Yellow Oval Room",    "priority": "medium",   "category": "security",     "attendees": ["Chief of Staff", "NSA"] },
+    { "id": "s18", "start": "22:00", "end": "22:30", "title": "私人时间",              "location": "Residence",           "priority": "low",      "category": "personal",     "attendees": [] }
+  ]
+}

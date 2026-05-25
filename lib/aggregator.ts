@@ -1,4 +1,12 @@
 import Parser from 'rss-parser';
+import { fetchArxiv } from './sources/arxiv';
+import { fetchGhTrending } from './sources/gh-trending';
+import { fetchCoingecko } from './sources/coingecko';
+import { fetchFrankfurter } from './sources/frankfurter';
+import { fetchWorldBank } from './sources/worldbank';
+import { fetchFred } from './sources/fred';
+
+export type Priority = 'high' | 'medium' | 'low';
 
 export type FeedItem = {
   id: string;
@@ -8,6 +16,7 @@ export type FeedItem = {
   url: string;
   summary?: string;
   publishedAt: string;
+  priority?: Priority;
 };
 
 const SOURCES = [
@@ -87,8 +96,17 @@ async function fetchHn(s: any): Promise<FeedItem[]> {
   }
 }
 
+function inferPriority(it: FeedItem): Priority {
+  if (it.priority) return it.priority;
+  // USGS 显著地震 — 任意 M>=6 视为 high
+  const m = it.title.match(/^M(\d+(?:\.\d+)?)/);
+  if (m && Number(m[1]) >= 6) return 'high';
+  if (it.category === '灾害') return 'medium';
+  return 'low';
+}
+
 export async function fetchAllFeeds(): Promise<FeedItem[]> {
-  const results = await Promise.all(
+  const legacy = await Promise.all(
     SOURCES.map(async (s) => {
       try {
         if (s.protocol === 'rss') return await fetchRss(s);
@@ -101,5 +119,17 @@ export async function fetchAllFeeds(): Promise<FeedItem[]> {
       }
     })
   );
-  return results.flat().sort((a, b) => (b.publishedAt > a.publishedAt ? 1 : -1));
+  const extra = await Promise.all([
+    fetchArxiv(),
+    fetchGhTrending(),
+    fetchCoingecko(),
+    fetchFrankfurter(),
+    fetchWorldBank(),
+    fetchFred(),
+  ]);
+  const all = [...legacy.flat(), ...extra.flat()].map((it) => ({
+    ...it,
+    priority: inferPriority(it),
+  }));
+  return all.sort((a, b) => (b.publishedAt > a.publishedAt ? 1 : -1)).slice(0, 60);
 }

@@ -1,4 +1,5 @@
 import './globals.css';
+import Link from 'next/link';
 import Seal from './components/Seal';
 
 export const metadata = {
@@ -32,9 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <header className="border-b-2 border-ink bg-paper-dark/60 backdrop-blur px-6 py-4">
-          <div className="max-w-6xl mx-auto flex items-center gap-4">
+          <div className="max-w-6xl mx-auto flex items-center gap-4 flex-wrap">
             <Seal size={56} />
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h1 className="font-display text-2xl text-ink leading-none">
                 总统模拟器
                 <span className="text-stamp-red"> · </span>
@@ -44,6 +45,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Office of the President · Situation Room
               </p>
             </div>
+            <nav className="flex items-center gap-1 text-sm font-display">
+              <Link href="/"          className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">简报</Link>
+              <Link href="/portfolio" className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">资产</Link>
+              <Link href="/schedule"  className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">日程</Link>
+            </nav>
             <div className="text-right">
               <div className="font-mono text-sm text-ink">{todayStr()}</div>
               {/* 仿邮戳序号 */}
