@@ -48,6 +48,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex items-center gap-1 text-sm font-display">
               <Link href="/"          className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">简报</Link>
               <Link href="/portfolio" className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">资产</Link>
+              <Link href="/market"    className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">市场</Link>
+              <Link href="/fed"       className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">美联储</Link>
               <Link href="/schedule"  className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">日程</Link>
             </nav>
             <div className="text-right">
