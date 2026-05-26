@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   basePath: '/president-sim',
   assetPrefix: '/president-sim/',
   trailingSlash: true,

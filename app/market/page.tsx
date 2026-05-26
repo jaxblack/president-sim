@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import SectionHeader from '../components/SectionHeader';
-import type { Quote, RatePoint, CurvePoint } from '@/lib/market';
-import { DEFAULT_WATCHLIST, fetchQuotes, fetchRates, fetchYieldCurve } from '@/lib/market';
-import { WATCHLIST_LS_KEY } from '@/lib/fed';
+import type { Quote, RatePoint, RateSeries } from '@/lib/market';
+import { DEFAULT_WATCHLIST, MARKET_WATCHLIST_LS_KEY, fetchQuotes, fetchRates, fetchRateSeries } from '@/lib/market';
 
 type Tab = 'stocks' | 'rates';
 
@@ -22,7 +21,7 @@ function fmtVol(n: number) {
 function loadWatchlist(): string[] {
   if (typeof window === 'undefined') return DEFAULT_WATCHLIST;
   try {
-    const raw = localStorage.getItem(WATCHLIST_LS_KEY);
+    const raw = localStorage.getItem(MARKET_WATCHLIST_LS_KEY);
     if (!raw) return DEFAULT_WATCHLIST;
     const arr = JSON.parse(raw);
     if (Array.isArray(arr) && arr.every((x) => typeof x === 'string') && arr.length) return arr;
@@ -31,35 +30,36 @@ function loadWatchlist(): string[] {
 }
 
 function saveWatchlist(list: string[]) {
-  try { localStorage.setItem(WATCHLIST_LS_KEY, JSON.stringify(list)); } catch {}
+  try { localStorage.setItem(MARKET_WATCHLIST_LS_KEY, JSON.stringify(list)); } catch {}
 }
 
-function YieldCurve({ curve }: { curve: CurvePoint[] }) {
-  if (!curve.length) return null;
-  const W = 320, H = 140, P = 28;
-  const xs = curve.map((c) => c.years);
-  const ys = curve.map((c) => c.yieldPct);
-  const xMin = Math.min(...xs), xMax = Math.max(...xs);
-  const yMin = Math.min(...ys) - 0.2, yMax = Math.max(...ys) + 0.2;
-  const sx = (v: number) => P + ((v - xMin) / (xMax - xMin || 1)) * (W - 2 * P);
-  const sy = (v: number) => H - P - ((v - yMin) / (yMax - yMin || 1)) * (H - 2 * P);
-  const path = curve.map((c, i) => `${i === 0 ? 'M' : 'L'} ${sx(c.years).toFixed(1)} ${sy(c.yieldPct).toFixed(1)}`).join(' ');
+function Sparkline({ values, positive }: { values: number[]; positive: boolean }) {
+  if (!values?.length) return null;
+  const W = 110, H = 34, P = 3;
+  const min = Math.min(...values), max = Math.max(...values);
+  const x = (i: number) => P + (i / Math.max(1, values.length - 1)) * (W - 2 * P);
+  const y = (v: number) => H - P - ((v - min) / (max - min || 1)) * (H - 2 * P);
+  const path = values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  return <svg viewBox={`0 0 ${W} ${H}`} className="w-28"><path d={path} fill="none" stroke={positive ? '#2c5f4f' : '#c0392b'} strokeWidth="2" /></svg>;
+}
+
+function RateChart({ series }: { series: RateSeries[] }) {
+  const all = series.flatMap((s) => s.points.map((p) => p.value));
+  if (!all.length) return <div className="text-ink/50 text-sm">加载中…</div>;
+  const W = 420, H = 180, P = 30;
+  const min = Math.min(...all) - 0.1, max = Math.max(...all) + 0.1;
+  const x = (i: number, len: number) => P + (i / Math.max(1, len - 1)) * (W - 2 * P);
+  const y = (v: number) => H - P - ((v - min) / (max - min || 1)) * (H - 2 * P);
+  const colors = ['#c0392b', '#2c5f4f', '#1c2331'];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-md">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-lg">
       <rect x="0.5" y="0.5" width={W - 1} height={H - 1} fill="none" stroke="#e8e0cc" />
-      <path d={path} fill="none" stroke="#c0392b" strokeWidth={2} />
-      {curve.map((c) => (
-        <g key={c.tenor}>
-          <circle cx={sx(c.years)} cy={sy(c.yieldPct)} r={3} fill="#1c2331" />
-          <text x={sx(c.years)} y={H - 8} textAnchor="middle" fontSize="10" fill="#1c2331" fontFamily="monospace">
-            {c.tenor}
-          </text>
-          <text x={sx(c.years)} y={sy(c.yieldPct) - 8} textAnchor="middle" fontSize="9" fill="#c0392b" fontFamily="monospace">
-            {c.yieldPct.toFixed(2)}
-          </text>
-        </g>
-      ))}
-      <text x={P} y={16} fontSize="11" fontFamily="'Bree Serif',serif" fill="#1c2331">Yield Curve (US Treasury)</text>
+      {series.map((s, si) => {
+        const path = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i, s.points.length).toFixed(1)} ${y(p.value).toFixed(1)}`).join(' ');
+        return <path key={s.id} d={path} fill="none" stroke={colors[si % colors.length]} strokeWidth={2} />;
+      })}
+      <text x={P} y={18} fontSize="11" fontFamily="'Bree Serif',serif" fill="#1c2331">FRED · last 30 points</text>
+      {series.map((s, i) => <text key={s.id} x={P} y={H - 10 - i * 14} fontSize="10" fontFamily="monospace" fill={colors[i % colors.length]}>{s.id}</text>)}
     </svg>
   );
 }
@@ -69,7 +69,7 @@ export default function MarketPage() {
   const [watchlist, setWatchlist] = useState<string[]>(DEFAULT_WATCHLIST);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [rates, setRates] = useState<RatePoint[]>([]);
-  const [curve, setCurve] = useState<CurvePoint[]>([]);
+  const [rateSeries, setRateSeries] = useState<RateSeries[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [addSym, setAddSym] = useState('');
@@ -101,8 +101,8 @@ export default function MarketPage() {
     let cancel = false;
     async function tick() {
       try {
-        const [rs, cv] = await Promise.all([fetchRates(), fetchYieldCurve()]);
-        if (!cancel) { setRates(rs); setCurve(cv); }
+        const [rs, series] = await Promise.all([fetchRates(), fetchRateSeries()]);
+        if (!cancel) { setRates(rs); setRateSeries(series); }
       } catch {}
     }
     tick();
@@ -176,6 +176,7 @@ export default function MarketPage() {
                     <th className="text-right">涨跌</th>
                     <th className="text-right">涨跌幅</th>
                     <th className="text-right">成交量</th>
+                    <th className="text-right">7日</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -194,6 +195,7 @@ export default function MarketPage() {
                           {up ? '+' : ''}{fmtNum(q.changePct)}%
                         </td>
                         <td className="text-right font-mono text-ink/70">{fmtVol(q.volume)}</td>
+                        <td className="text-right"><Sparkline values={q.sparkline} positive={up} /></td>
                         <td className="text-right">
                           <button
                             onClick={() => removeSymbol(q.symbol)}
@@ -205,13 +207,13 @@ export default function MarketPage() {
                     );
                   })}
                   {quotes.length === 0 && (
-                    <tr><td colSpan={7} className="text-center text-ink/50 py-6">无数据</td></tr>
+                    <tr><td colSpan={8} className="text-center text-ink/50 py-6">无数据</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="text-[11px] text-ink/50 mt-2 font-mono">
-              5s 轮询 · 数据源 Yahoo Finance(失败回退本地 mock)· watchlist 存 localStorage[{WATCHLIST_LS_KEY}]
+              5s 轮询 · 数据源 /api/market/quotes → Yahoo Finance(失败回退 mock) · localStorage[{MARKET_WATCHLIST_LS_KEY}]
             </div>
           </div>
         </>
@@ -236,7 +238,7 @@ export default function MarketPage() {
             </div>
           </div>
           <div className="briefing-card flex items-center justify-center">
-            <YieldCurve curve={curve} />
+            <RateChart series={rateSeries} />
           </div>
         </div>
       )}
