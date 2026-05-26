@@ -1,226 +1,386 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import {
   loadSchedule,
-  getCurrentItem,
-  getUpcoming,
-  getDensityByHour,
-  durationMin,
-  CATEGORY_COLOR,
-  CATEGORY_CN,
-  nowHHMM,
+  saveSchedule,
+  addItem,
+  updateItem,
+  deleteItem,
+  applyEffectsForItem,
+  SCHEDULE_TYPES,
   type ScheduleItem,
+  type ScheduleType,
 } from '@/lib/schedule';
-import SectionHeader from '../components/SectionHeader';
 
-const ROW_HEIGHT = 18; // px per 15 min slot
-const START_HOUR = 6;
-const END_HOUR = 23; // inclusive (last row label = 23:00)
-const SLOTS_PER_HOUR = 4;
+type View = 'week' | 'month';
 
-function toMin(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
+function startOfWeek(d: Date): Date {
+  const x = new Date(d);
+  const dow = (x.getDay() + 6) % 7; // Monday start
+  x.setDate(x.getDate() - dow);
+  x.setHours(0, 0, 0, 0);
+  return x;
 }
 
-function topOf(hhmm: string): number {
-  const m = toMin(hhmm);
-  const baseMin = START_HOUR * 60;
-  return ((m - baseMin) / 15) * ROW_HEIGHT;
+function startOfMonth(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), 1);
+  x.setHours(0, 0, 0, 0);
+  return x;
 }
 
-function priorityBadge(p: ScheduleItem['priority']) {
-  const map: Record<typeof p, { txt: string; cls: string }> = {
-    critical: { txt: '🚨 CRITICAL', cls: 'bg-stamp-red/15 text-stamp-red border-stamp-red' },
-    high:     { txt: 'HIGH',        cls: 'bg-alert/15 text-alert border-alert' },
-    medium:   { txt: 'MED',         cls: 'bg-ink/10 text-ink/80 border-ink/40' },
-    low:      { txt: 'LOW',         cls: 'bg-oval-green/10 text-oval-green border-oval-green/60' },
-  };
-  const v = map[p];
-  return (
-    <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 border rounded-sm ${v.cls}`}>
-      {v.txt}
-    </span>
-  );
+function fmtDay(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function toDateInputVal(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromDateInputVal(s: string): number {
+  return new Date(s).getTime();
+}
+
+const TYPE_COLOR: Record<ScheduleType, string> = {
+  '会议': '#0a1929',
+  '演讲': '#7f5af0',
+  '外访': '#2c5f4f',
+  '签约': '#c9a961',
+  '公开': '#e67e22',
+  '私人': '#94a3b8',
+};
+
+const SCORE_KEYS = ['民意', '经济', '国际形象', '国家安全', '总分'] as const;
 
 export default function SchedulePage() {
-  const s = loadSchedule();
-  const now = nowHHMM();
-  const cur = getCurrentItem(s, now);
-  const upcoming = getUpcoming(s, now, 3);
+  const [items, setItems] = useState<ScheduleItem[]>([]);
+  const [view, setView] = useState<View>('week');
+  const [anchor, setAnchor] = useState<Date>(new Date());
+  const [editing, setEditing] = useState<ScheduleItem | null>(null);
+  const [isNew, setIsNew] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  const totalMeetings = s.items.length;
-  const totalMin = s.items.reduce((a, it) => a + durationMin(it), 0);
-  const criticalCount = s.items.filter((it) => it.priority === 'critical').length;
-  const freeMin = (END_HOUR - START_HOUR + 1) * 60 - totalMin;
+  useEffect(() => {
+    setItems(loadSchedule());
+    setReady(true);
+  }, []);
 
-  const density = getDensityByHour(s);
+  const persist = (next: ScheduleItem[]) => {
+    setItems(next);
+    saveSchedule(next);
+  };
 
-  const hours: number[] = [];
-  for (let h = START_HOUR; h <= END_HOUR; h++) hours.push(h);
+  const openNew = (date: Date) => {
+    const d = new Date(date);
+    d.setHours(9, 0, 0, 0);
+    setEditing({
+      id: '',
+      ts: d.getTime(),
+      durationMin: 60,
+      title: '',
+      type: '会议',
+      location: '',
+      participants: [],
+      notes: '',
+      effects: [],
+    });
+    setIsNew(true);
+  };
 
-  const railHeight = (END_HOUR - START_HOUR + 1) * 60 / 15 * ROW_HEIGHT;
-  const nowTop = (() => {
-    const m = toMin(now);
-    if (m < START_HOUR * 60 || m > (END_HOUR + 1) * 60) return null;
-    return ((m - START_HOUR * 60) / 15) * ROW_HEIGHT;
-  })();
+  const openEdit = (it: ScheduleItem) => {
+    setEditing({ ...it, participants: [...(it.participants ?? [])], effects: [...(it.effects ?? [])] });
+    setIsNew(false);
+  };
+
+  const saveEditing = () => {
+    if (!editing) return;
+    if (!editing.title.trim()) return;
+    if (isNew) {
+      const next = addItem(items, editing);
+      persist(next);
+      // 应用 effects 到分数
+      applyEffectsForItem(editing, '日程: ' + editing.title);
+    } else {
+      const prev = items.find((x) => x.id === editing.id);
+      const next = updateItem(items, editing);
+      persist(next);
+      // 若 effects 改变,把差额应用
+      if (prev) applyEffectsForItem(editing, '日程更新: ' + editing.title, prev);
+    }
+    setEditing(null);
+  };
+
+  const removeEditing = () => {
+    if (!editing || isNew) {
+      setEditing(null);
+      return;
+    }
+    persist(deleteItem(items, editing.id));
+    setEditing(null);
+  };
+
+  // === 视图数据 ===
+  const cells = useMemo(() => {
+    if (view === 'week') {
+      const start = startOfWeek(anchor);
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        return d;
+      });
+    }
+    const start = startOfMonth(anchor);
+    const dow = (start.getDay() + 6) % 7;
+    const gridStart = new Date(start);
+    gridStart.setDate(start.getDate() - dow);
+    return Array.from({ length: 42 }, (_, i) => {
+      const d = new Date(gridStart);
+      d.setDate(gridStart.getDate() + i);
+      return d;
+    });
+  }, [view, anchor]);
+
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, ScheduleItem[]>();
+    for (const it of items) {
+      const d = new Date(it.ts);
+      const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const arr = map.get(key) ?? [];
+      arr.push(it);
+      map.set(key, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.ts - b.ts);
+    return map;
+  }, [items]);
+
+  const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const shift = (delta: number) => {
+    const d = new Date(anchor);
+    if (view === 'week') d.setDate(d.getDate() + delta * 7);
+    else d.setMonth(d.getMonth() + delta);
+    setAnchor(d);
+  };
+
+  if (!ready) return <div className="text-ink/60">加载日程…</div>;
+
+  const todayKey = dayKey(new Date());
 
   return (
     <div className="space-y-6">
-      <SectionHeader title="日程 · Daily Schedule" subtitle="potus calendar" icon="📅" />
-
-      {/* KPI */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="briefing-card">
-          <div className="text-[11px] uppercase tracking-widest text-ink/60">今日总会议</div>
-          <div className="font-display text-2xl text-ink mt-1">{totalMeetings}</div>
-        </div>
-        <div className="briefing-card">
-          <div className="text-[11px] uppercase tracking-widest text-ink/60">总占用</div>
-          <div className="font-display text-2xl text-ink mt-1">{Math.floor(totalMin / 60)}h {totalMin % 60}m</div>
-        </div>
-        <div className="briefing-card">
-          <div className="text-[11px] uppercase tracking-widest text-ink/60">Critical 项</div>
-          <div className="font-display text-2xl text-stamp-red mt-1">{criticalCount}</div>
-        </div>
-        <div className="briefing-card">
-          <div className="text-[11px] uppercase tracking-widest text-ink/60">空闲</div>
-          <div className="font-display text-2xl text-oval-green mt-1">{Math.floor(freeMin / 60)}h {freeMin % 60}m</div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="font-display text-2xl text-ink">📅 日程 · Schedule</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={() => shift(-1)} className="px-3 py-1 border border-ink/30 rounded hover:bg-paper-dark">‹</button>
+          <button onClick={() => setAnchor(new Date())} className="px-3 py-1 border border-ink/30 rounded hover:bg-paper-dark text-sm">今天</button>
+          <button onClick={() => shift(1)} className="px-3 py-1 border border-ink/30 rounded hover:bg-paper-dark">›</button>
+          <div className="ml-2 flex rounded overflow-hidden border border-ink/30">
+            <button onClick={() => setView('week')} className={`px-3 py-1 text-sm ${view === 'week' ? 'bg-ink text-paper' : 'hover:bg-paper-dark'}`}>周</button>
+            <button onClick={() => setView('month')} className={`px-3 py-1 text-sm ${view === 'month' ? 'bg-ink text-paper' : 'hover:bg-paper-dark'}`}>月</button>
+          </div>
+          <button
+            onClick={() => openNew(new Date())}
+            className="ml-2 px-3 py-1 bg-stamp-red text-paper rounded text-sm hover:opacity-90"
+          >
+            + 新增
+          </button>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr,320px] gap-6">
-        {/* Timeline */}
-        <div className="briefing-card relative overflow-hidden">
-          <div className="text-[11px] uppercase tracking-widest text-stamp-red mb-3">
-            Timeline · {s.date} · 当前 {now}
-          </div>
-          <div className="relative" style={{ height: railHeight }}>
-            {/* Hour grid */}
-            {hours.map((h, i) => (
-              <div
-                key={h}
-                className="absolute left-0 right-0 border-t border-ink/15 flex"
-                style={{ top: i * SLOTS_PER_HOUR * ROW_HEIGHT, height: SLOTS_PER_HOUR * ROW_HEIGHT }}
-              >
-                <div className="w-12 text-[11px] font-mono text-ink/50 pr-2 text-right pt-0.5">
-                  {String(h).padStart(2, '0')}:00
-                </div>
-                <div className="flex-1 border-l border-ink/20" />
-              </div>
-            ))}
+      <div className="text-[11px] uppercase tracking-widest text-ink/60">
+        {view === 'week'
+          ? `${fmtDay(cells[0])} – ${fmtDay(cells[6])}`
+          : `${anchor.getFullYear()} 年 ${anchor.getMonth() + 1} 月`}
+      </div>
 
-            {/* Now line */}
-            {nowTop !== null && (
-              <div
-                className="absolute left-12 right-0 border-t-2 border-stamp-red z-20 pointer-events-none"
-                style={{ top: nowTop }}
-              >
-                <span className="absolute -top-3 -left-12 text-[10px] font-mono bg-stamp-red text-paper px-1 rounded">
-                  NOW {now}
-                </span>
+      <div className={`grid gap-1 ${view === 'week' ? 'grid-cols-7' : 'grid-cols-7'}`}>
+        {['一', '二', '三', '四', '五', '六', '日'].map((w) => (
+          <div key={w} className="text-[11px] font-display text-ink/60 text-center pb-1">{w}</div>
+        ))}
+        {cells.map((d) => {
+          const key = dayKey(d);
+          const dayItems = itemsByDay.get(key) ?? [];
+          const isToday = key === todayKey;
+          const dim = view === 'month' && d.getMonth() !== anchor.getMonth();
+          return (
+            <div
+              key={key + d.toISOString()}
+              className={`border ${isToday ? 'border-stamp-red' : 'border-ink/20'} rounded p-1 cursor-pointer hover:bg-paper-dark/60 transition-colors min-h-[100px] ${dim ? 'opacity-40' : ''}`}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).dataset.evt) return;
+                openNew(d);
+              }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[11px] font-mono ${isToday ? 'text-stamp-red font-bold' : 'text-ink/60'}`}>{fmtDay(d)}</span>
+                <span className="text-[10px] text-ink/40">{dayItems.length}</span>
               </div>
-            )}
-
-            {/* Items */}
-            <div className="absolute left-12 right-2 top-0 bottom-0">
-              {s.items.map((it) => {
-                const top = topOf(it.start);
-                const height = Math.max((durationMin(it) / 15) * ROW_HEIGHT - 2, 16);
-                const color = CATEGORY_COLOR[it.category];
-                const isCritical = it.priority === 'critical';
-                const isCurrent = cur?.id === it.id;
-                return (
-                  <div
-                    key={it.id}
-                    className={`absolute left-0 right-0 rounded-md px-2 py-0.5 text-xs overflow-hidden transition-shadow ${isCurrent ? 'ring-2 ring-stamp-red shadow-briefing z-10' : ''}`}
-                    style={{
-                      top,
-                      height,
-                      background: color + '22',
-                      borderLeft: `4px solid ${color}`,
-                      borderTop: isCritical ? `1px solid ${color}` : undefined,
-                      borderRight: isCritical ? `1px solid ${color}` : undefined,
-                      borderBottom: isCritical ? `1px solid ${color}` : undefined,
-                    }}
-                    title={`${it.start}-${it.end} · ${it.title} @ ${it.location}`}
-                  >
-                    <div className="flex items-center gap-1 leading-tight">
-                      <span className="font-mono text-[10px] text-ink/70">{it.start}</span>
-                      {isCritical && <span>🚨</span>}
-                      <span className="font-semibold text-ink truncate">{it.title}</span>
+              <div className="space-y-0.5">
+                {dayItems.slice(0, view === 'week' ? 8 : 3).map((it) => {
+                  const t = new Date(it.ts);
+                  return (
+                    <div
+                      key={it.id}
+                      data-evt="1"
+                      onClick={(e) => { e.stopPropagation(); openEdit(it); }}
+                      className="text-[10px] px-1 py-0.5 rounded text-paper truncate cursor-pointer hover:opacity-80"
+                      style={{ background: TYPE_COLOR[it.type] }}
+                      title={`${pad(t.getHours())}:${pad(t.getMinutes())} ${it.title}`}
+                    >
+                      {pad(t.getHours())}:{pad(t.getMinutes())} {it.title}
                     </div>
-                    {height >= ROW_HEIGHT * 2 && (
-                      <div className="text-[10px] text-ink/60 truncate">
-                        {it.location} · {CATEGORY_CN[it.category]}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar: current + upcoming + density */}
-        <div className="space-y-4">
-          <div className="briefing-card">
-            <div className="text-[11px] uppercase tracking-widest text-stamp-red mb-2">Now</div>
-            {cur ? (
-              <>
-                <div className="font-display text-lg text-ink leading-tight">{cur.title}</div>
-                <div className="text-[11px] text-ink/60 mt-1">{cur.start}–{cur.end} · {cur.location}</div>
-                <div className="mt-2">{priorityBadge(cur.priority)}</div>
-                {cur.attendees.length > 0 && (
-                  <div className="text-[11px] text-ink/70 mt-2">参与:{cur.attendees.join(', ')}</div>
+                  );
+                })}
+                {dayItems.length > (view === 'week' ? 8 : 3) && (
+                  <div className="text-[10px] text-ink/50">+{dayItems.length - (view === 'week' ? 8 : 3)} 更多</div>
                 )}
-              </>
-            ) : (
-              <div className="text-sm text-ink/60">当前无安排</div>
-            )}
-          </div>
-
-          <div className="briefing-card">
-            <div className="text-[11px] uppercase tracking-widest text-stamp-red mb-2">Up Next</div>
-            <div className="space-y-3">
-              {upcoming.length === 0 && <div className="text-sm text-ink/60">今日剩余无安排</div>}
-              {upcoming.map((it) => (
-                <div key={it.id} className="flex items-start gap-2 text-sm">
-                  <div className="font-mono text-[11px] text-ink/60 w-12 flex-shrink-0 pt-0.5">{it.start}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-ink leading-tight truncate">{it.title}</div>
-                    <div className="text-[11px] text-ink/55">{it.location} · {CATEGORY_CN[it.category]}</div>
-                  </div>
-                </div>
-              ))}
+              </div>
             </div>
-          </div>
+          );
+        })}
+      </div>
 
-          <div className="briefing-card">
-            <div className="text-[11px] uppercase tracking-widest text-stamp-red mb-2">小时密度</div>
-            <div className="space-y-1">
-              {density.map((d) => {
-                const pct = Math.round((d.usedMin / 60) * 100);
-                return (
-                  <div key={d.hour} className="flex items-center gap-2 text-[11px]">
-                    <span className="font-mono w-10 text-ink/60">{String(d.hour).padStart(2, '0')}:00</span>
-                    <div className="flex-1 h-2 bg-paper-dark rounded-sm overflow-hidden">
-                      <div
-                        className="h-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: pct >= 80 ? '#c0392b' : pct >= 50 ? '#e67e22' : '#2c5f4f',
+      {/* Editor modal */}
+      {editing && (
+        <div className="fixed inset-0 bg-ink/50 z-50 flex items-center justify-center p-4" onClick={() => setEditing(null)}>
+          <div
+            className="bg-paper border-2 border-ink rounded-briefing p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-xl text-ink">{isNew ? '新建日程' : '编辑日程'}</h3>
+              <button onClick={() => setEditing(null)} className="text-ink/60 hover:text-ink">✕</button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">标题 *</label>
+                <input
+                  className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                  value={editing.title}
+                  onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                  placeholder="例:与日本首相会谈"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">开始</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                    value={toDateInputVal(editing.ts)}
+                    onChange={(e) => setEditing({ ...editing, ts: fromDateInputVal(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">时长(分)</label>
+                  <input
+                    type="number" min={5} step={5}
+                    className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                    value={editing.durationMin}
+                    onChange={(e) => setEditing({ ...editing, durationMin: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">类型</label>
+                  <select
+                    className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                    value={editing.type}
+                    onChange={(e) => setEditing({ ...editing, type: e.target.value as ScheduleType })}
+                  >
+                    {SCHEDULE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">地点</label>
+                  <input
+                    className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                    value={editing.location ?? ''}
+                    onChange={(e) => setEditing({ ...editing, location: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">参与者(逗号分隔)</label>
+                <input
+                  className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                  value={(editing.participants ?? []).join(', ')}
+                  onChange={(e) => setEditing({ ...editing, participants: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-1">备注</label>
+                <textarea
+                  className="w-full border border-ink/30 rounded px-2 py-1 bg-paper"
+                  rows={2}
+                  value={editing.notes ?? ''}
+                  onChange={(e) => setEditing({ ...editing, notes: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase tracking-widest text-ink/60 mb-2">分值影响 (Effects)</label>
+                <div className="space-y-1">
+                  {(editing.effects ?? []).map((ef, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <select
+                        className="border border-ink/30 rounded px-2 py-1 bg-paper text-xs flex-1"
+                        value={ef.key}
+                        onChange={(e) => {
+                          const eff = [...(editing.effects ?? [])];
+                          eff[i] = { ...eff[i], key: e.target.value };
+                          setEditing({ ...editing, effects: eff });
+                        }}
+                      >
+                        {SCORE_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        className="w-20 border border-ink/30 rounded px-2 py-1 bg-paper text-xs"
+                        value={ef.delta}
+                        onChange={(e) => {
+                          const eff = [...(editing.effects ?? [])];
+                          eff[i] = { ...eff[i], delta: Number(e.target.value) };
+                          setEditing({ ...editing, effects: eff });
                         }}
                       />
+                      <button
+                        onClick={() => {
+                          const eff = [...(editing.effects ?? [])];
+                          eff.splice(i, 1);
+                          setEditing({ ...editing, effects: eff });
+                        }}
+                        className="text-stamp-red text-xs hover:underline"
+                      >删</button>
                     </div>
-                    <span className="font-mono w-8 text-right text-ink/70">{pct}%</span>
-                  </div>
-                );
-              })}
+                  ))}
+                  <button
+                    onClick={() => setEditing({ ...editing, effects: [...(editing.effects ?? []), { key: '民意', delta: 1 }] })}
+                    className="text-xs text-stamp-red hover:underline"
+                  >+ 新增 effect</button>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-between mt-5">
+              <button
+                onClick={removeEditing}
+                className="px-3 py-1.5 text-sm text-stamp-red border border-stamp-red rounded hover:bg-stamp-red hover:text-paper"
+              >
+                {isNew ? '取消' : '删除'}
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setEditing(null)} className="px-3 py-1.5 text-sm border border-ink/30 rounded">关闭</button>
+                <button onClick={saveEditing} className="px-4 py-1.5 text-sm bg-ink text-paper rounded hover:opacity-90">保存</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
