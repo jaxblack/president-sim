@@ -51,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/orders"    className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">命令</Link>
               <Link href="/portfolio" className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">资产</Link>
               <Link href="/market"    className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">市场</Link>
+              <Link href="/realestate" className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">房产</Link>
               <Link href="/fed"       className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">美联储</Link>
               <Link href="/schedule"  className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">日程</Link>
               <Link href="/diplomacy" className="px-3 py-1.5 rounded-md hover:bg-paper border border-transparent hover:border-ink/30 text-ink">外交</Link>
