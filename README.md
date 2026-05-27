@@ -94,3 +94,22 @@ done
 ---
 
 **注**:本应用所有信息均来自公开来源,仅供模拟演示,不构成任何投资 / 政策建议。
+
+
+## Recent runs
+
+### 2026-05-27 — Round 6 demo (plan skypool-plan-9a982a77)
+
+本轮通过 SkyPool 多 follower 协作给总统模拟器加入 7 个新模块:**新闻源可配/注释/行政命令**(/news /orders)、**美股 + 美债利率 + 美联储看板**(/market /fed)、**12 城房产看板**(/realestate)、**日程编辑**(/schedule)、**他国态度**(/diplomacy)、**国力分值**(/scores)。
+
+<p>
+<img src="docs/runs/2026-05-26-president-sim-r6-home.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-news.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-orders.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-market.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-fed.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-schedule.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-diplomacy.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-scores.png" width="380"/>
+<img src="docs/runs/2026-05-26-president-sim-r6-realestate.png" width="380"/>
+</p>
